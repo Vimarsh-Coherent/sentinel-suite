@@ -1,0 +1,48 @@
+{
+  "name": "sentinel-suite",
+  "owner": {
+    "name": "micoherent7",
+    "email": "micoherent7@gmail.com"
+  },
+  "metadata": {
+    "description": "Sentinel Suite — one toolkit for serious Claude Code work: a commit/PR guardrail, graph-based code intelligence, a large skills/agents library, and multi-agent orchestration, plus a unified MCP server to connect them all."
+  },
+  "plugins": [
+    {
+      "name": "sentinel-guard",
+      "source": "./plugins/undercover",
+      "description": "Sentinel Suite Guard — keeps secrets, internal codenames, unreleased versions, and AI attribution out of your commits and PRs. Python engine + agent + skill + hooks.",
+      "version": "0.1.0",
+      "license": "MIT",
+      "category": "workflow",
+      "keywords": ["sentinel-suite", "guardrail", "secrets", "redaction", "git"]
+    },
+    {
+      "name": "sentinel-graph",
+      "source": "./plugins/code-graph",
+      "description": "Sentinel Suite Graph — token-efficient, graph-based code intelligence (impact radius, architecture overview, hubs/bridges, semantic search). Powered by code-review-graph (MIT).",
+      "version": "0.1.0",
+      "license": "MIT",
+      "category": "code-review",
+      "keywords": ["sentinel-suite", "code-review", "knowledge-graph", "impact-analysis", "mcp"]
+    },
+    {
+      "name": "sentinel-orchestrator",
+      "source": "./plugins/orchestrator",
+      "description": "Sentinel Suite Orchestrator — run many Claude Code sessions in parallel as scoped 'tentacles' wired to the rest of Sentinel Suite. Powered by Octogent (MIT).",
+      "version": "0.1.0",
+      "license": "MIT",
+      "category": "workflow",
+      "keywords": ["sentinel-suite", "orchestration", "multi-agent", "tentacles"]
+    },
+    {
+      "name": "sentinel-skills",
+      "source": "./vendor/ecc",
+      "description": "Sentinel Suite Skills — a large ready-made library of agents, skills, and commands for TDD, security, code review, and language-specific work. Powered by ecc (MIT).",
+      "version": "2.0.0",
+      "license": "MIT",
+      "category": "workflow",
+      "keywords": ["sentinel-suite", "agents", "skills", "commands", "tdd", "security"]
+    }
+  ]
+}

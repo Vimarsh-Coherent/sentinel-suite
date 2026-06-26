@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "sentinel-suite": {
+      "command": "uvx",
+      "args": ["--from", "/absolute/path/to/sentinel-suite/mcp-server", "sentinel-suite-mcp"],
+      "env": {
+        "SENTINEL_SUITE_ROOT": "/absolute/path/to/sentinel-suite"
+      },
+      "type": "stdio"
+    }
+  }
+}

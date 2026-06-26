@@ -1,0 +1,29 @@
+{
+  "includeCoAuthoredBy": false,
+
+  "//": "includeCoAuthoredBy:false is the official Claude Code switch that stops the 'Co-Authored-By: Claude' trailer and the 'Generated with Claude Code' line from being added to commits and PRs. The hooks below are the undercover enforcement backstop: they inject the 'do not blow your cover' instruction and block any commit/PR command whose text still reveals AI/internal info.",
+
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/plugins/undercover/scripts/hook_inject.py\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/plugins/undercover/scripts/hook_guard.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

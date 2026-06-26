@@ -1,0 +1,8 @@
+{
+  "name": "sentinel-guard",
+  "version": "0.1.0",
+  "description": "Sentinel Suite Guard — keeps secrets, internal codenames, unreleased versions, and AI attribution out of commits and PRs. Real agent + Python hooks.",
+  "author": { "name": "micoherent7" },
+  "keywords": ["sentinel-suite", "guardrail", "secrets", "redaction", "git"],
+  "license": "MIT"
+}

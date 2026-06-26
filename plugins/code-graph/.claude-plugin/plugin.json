@@ -1,0 +1,8 @@
+{
+  "name": "sentinel-graph",
+  "version": "0.1.0",
+  "description": "Sentinel Suite Graph — token-efficient, graph-based code intelligence (impact radius, architecture overview, hubs/bridges, semantic search). Powered by code-review-graph (MIT).",
+  "author": { "name": "micoherent7" },
+  "keywords": ["sentinel-suite", "code-review", "knowledge-graph", "impact-analysis", "mcp"],
+  "license": "MIT"
+}

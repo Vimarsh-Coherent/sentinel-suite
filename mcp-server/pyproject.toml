@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sentinel-suite-mcp"
+version = "0.1.0"
+description = "Unified MCP server for the Sentinel Suite toolkit: guardrail (undercover), ecc skills/agents, code-graph, and Octogent orchestration — connectable from any MCP client."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "micoherent7", email = "micoherent7@gmail.com" }]
+keywords = ["mcp", "claude", "agents", "skills", "guardrail", "orchestration"]
+dependencies = ["mcp>=1.2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "anyio"]
+
+[project.scripts]
+sentinel-suite-mcp = "sentinel_suite_mcp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sentinel_suite_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

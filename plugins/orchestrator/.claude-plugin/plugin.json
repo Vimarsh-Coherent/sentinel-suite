@@ -1,0 +1,8 @@
+{
+  "name": "sentinel-orchestrator",
+  "version": "0.1.0",
+  "description": "Sentinel Suite Orchestrator — run many Claude Code sessions in parallel as scoped 'tentacles' wired to the rest of Sentinel Suite. Powered by Octogent (MIT).",
+  "author": { "name": "micoherent7" },
+  "keywords": ["sentinel-suite", "orchestration", "multi-agent", "tentacles"],
+  "license": "MIT"
+}
