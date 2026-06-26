@@ -12,49 +12,67 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import Optional
 
 
-def repo_root() -> Path:
+def repo_root() -> Optional[Path]:
+    """The Sentinel Suite repo checkout, if available.
+
+    Resolves the SENTINEL_SUITE_ROOT env var, else four parents up from this
+    file (works in an editable install inside the repo). Returns None when the
+    package is pip-installed standalone and no checkout is reachable — callers
+    then degrade gracefully.
+    """
     env = os.environ.get("SENTINEL_SUITE_ROOT")
-    if env:
+    if env and Path(env).is_dir():
         return Path(env)
-    return Path(__file__).resolve().parents[3]
+    guess = Path(__file__).resolve().parents[3]
+    return guess if (guess / "vendor").is_dir() or (guess / "plugins").is_dir() else None
 
 
-def _ecc() -> Path:
-    return repo_root() / "vendor" / "ecc"
+_NO_REPO = ("This needs the full Sentinel Suite checkout. Clone it and set "
+            "SENTINEL_SUITE_ROOT, e.g.:\n"
+            "  git clone https://github.com/Vimarsh-Coherent/sentinel-suite\n"
+            "  export SENTINEL_SUITE_ROOT=/path/to/sentinel-suite")
+
+
+def _ecc() -> Optional[Path]:
+    root = repo_root()
+    return (root / "vendor" / "ecc") if root else None
 
 
 # ---------------------------------------------------------------------------
-# Guardrail (undercover) — reuse the in-repo undercover engine
+# Guardrail (undercover) — bundled engine, works with zero checkout
 # ---------------------------------------------------------------------------
 
 def _load_undercover():
-    scripts = repo_root() / "plugins" / "undercover" / "scripts"
-    if str(scripts) not in sys.path:
-        sys.path.insert(0, str(scripts))
-    import undercover  # type: ignore
-    return undercover
+    # The guard engine is bundled in the package (_guard.py) so the guardrail
+    # tools work even when pip-installed standalone.
+    from . import _guard  # type: ignore
+    return _guard
+
+
+def _extra_terms_dir() -> str:
+    # Look for an optional .undercover.json wordlist in the user's cwd.
+    return os.getcwd()
 
 
 def guardrail_scan(text: str) -> list[dict]:
     uc = _load_undercover()
-    rules = uc.build_rules(uc.load_extra_terms(str(repo_root())))
+    rules = uc.build_rules(uc.load_extra_terms(_extra_terms_dir()))
     return [f.to_dict() for f in uc.scan(text, rules)]
 
 
 def guardrail_redact(text: str) -> str:
     uc = _load_undercover()
-    rules = uc.build_rules(uc.load_extra_terms(str(repo_root())))
+    rules = uc.build_rules(uc.load_extra_terms(_extra_terms_dir()))
     return uc.redact(text, rules)
 
 
 def guardrail_status() -> dict:
     uc = _load_undercover()
-    d = uc.is_undercover(cwd=str(repo_root()))
+    d = uc.is_undercover(cwd=os.getcwd())
     return {"active": d.active, "reason": d.reason}
 
 
@@ -79,7 +97,10 @@ def _frontmatter(text: str) -> dict:
 
 
 def ecc_list_skills(query: str = "") -> list[dict]:
-    base = _ecc() / "skills"
+    ecc = _ecc()
+    if ecc is None:
+        return [{"name": "(unavailable)", "description": _NO_REPO}]
+    base = ecc / "skills"
     if not base.is_dir():
         return []
     q = query.lower()
@@ -98,14 +119,20 @@ def ecc_list_skills(query: str = "") -> list[dict]:
 
 
 def ecc_get_skill(name: str) -> str:
-    sk = _ecc() / "skills" / name / "SKILL.md"
+    ecc = _ecc()
+    if ecc is None:
+        return _NO_REPO
+    sk = ecc / "skills" / name / "SKILL.md"
     if not sk.is_file():
         return f"skill not found: {name}"
     return sk.read_text(encoding="utf-8", errors="ignore")
 
 
 def ecc_list_agents(query: str = "") -> list[dict]:
-    base = _ecc() / "agents"
+    ecc = _ecc()
+    if ecc is None:
+        return [{"name": "(unavailable)", "description": _NO_REPO}]
+    base = ecc / "agents"
     if not base.is_dir():
         return []
     q = query.lower()
@@ -121,7 +148,10 @@ def ecc_list_agents(query: str = "") -> list[dict]:
 
 
 def ecc_get_agent(name: str) -> str:
-    f = _ecc() / "agents" / (name if name.endswith(".md") else f"{name}.md")
+    ecc = _ecc()
+    if ecc is None:
+        return _NO_REPO
+    f = ecc / "agents" / (name if name.endswith(".md") else f"{name}.md")
     if not f.is_file():
         return f"agent not found: {name}"
     return f.read_text(encoding="utf-8", errors="ignore")
@@ -140,7 +170,7 @@ def code_graph(command: str = "status", cwd: Optional[str] = None) -> str:
     try:
         out = subprocess.run(
             ["code-review-graph", command],
-            capture_output=True, text=True, timeout=120, cwd=cwd or str(repo_root()),
+            capture_output=True, text=True, timeout=120, cwd=cwd or os.getcwd(),
         )
     except FileNotFoundError:
         return ("code-review-graph CLI not installed. Install with "
@@ -173,7 +203,13 @@ def create_tentacle(name: str, scope: str = "", cwd: Optional[str] = None) -> st
 
 
 def octogent_launch_command() -> str:
-    launcher = repo_root() / "plugins" / "orchestrator" / "scripts" / "launch_octogent.py"
+    root = repo_root()
+    if root is None:
+        return ("The Orchestrator (Octogent) is a Node app and needs the full "
+                "checkout.\n" + _NO_REPO + "\nThen run: "
+                "python plugins/orchestrator/scripts/launch_octogent.py "
+                "(needs Node >= 22 and pnpm; dashboard at http://localhost:8787).")
+    launcher = root / "plugins" / "orchestrator" / "scripts" / "launch_octogent.py"
     return (
         f"Run: python \"{launcher}\"\n"
         "Needs Node >= 22 and pnpm. The dashboard opens at http://localhost:8787.\n"
@@ -186,13 +222,19 @@ def octogent_launch_command() -> str:
 # ---------------------------------------------------------------------------
 
 def info() -> dict:
+    root = repo_root()
+    skills = ecc_list_skills()
+    n_skills = 0 if (skills and skills[0].get("name") == "(unavailable)") else len(skills)
     return {
         "name": "sentinel-suite",
-        "repo_root": str(repo_root()),
+        "repo_root": str(root) if root else None,
+        "mode": "full checkout" if root else "standalone (pip) — guardrail only; clone for ecc/orchestrator",
         "capabilities": {
-            "Sentinel Suite Guard": "scan / redact / status",
-            "Sentinel Suite Skills": f"{len(ecc_list_skills())} skills, {len(ecc_list_agents())} agents (powered by ecc)",
-            "Sentinel Suite Graph": "status / build / update (powered by code-review-graph)",
-            "Sentinel Suite Orchestrator": "create tentacles, launch dashboard (powered by Octogent)",
+            "Sentinel Suite Guard": "scan / redact / status (always available)",
+            "Sentinel Suite Skills": (f"{n_skills} skills (powered by ecc)" if root
+                                      else "needs checkout"),
+            "Sentinel Suite Graph": "status / build / update (needs code-review-graph CLI)",
+            "Sentinel Suite Orchestrator": ("create tentacles; launch dashboard" if root
+                                            else "needs checkout (Node app)"),
         },
     }

@@ -19,8 +19,39 @@ client (Claude Code, Cursor, Windsurf, Zed, Continue, …) can connect and use i
 | `octogent_launch_command()` | get the command to launch the Octogent dashboard |
 | `sentinel_suite_info()` | overview + capability counts |
 
-## Install
+## Install — one line (no clone needed)
 
+The package is self-contained: the **guardrail works standalone**, and the
+ecc / code-graph / orchestrator tools light up automatically if a full checkout
+is present (set `SENTINEL_SUITE_ROOT`).
+
+**pip (one line):**
+```bash
+pip install "git+https://github.com/Vimarsh-Coherent/sentinel-suite#subdirectory=mcp-server"
+```
+
+**Connect MCP (auto-installs on connect via uvx — nothing to pip first):**
+```json
+{
+  "mcpServers": {
+    "sentinel-suite": {
+      "command": "uvx",
+      "args": ["--from",
+               "git+https://github.com/Vimarsh-Coherent/sentinel-suite#subdirectory=mcp-server",
+               "sentinel-suite-mcp"],
+      "type": "stdio"
+    }
+  }
+}
+```
+That's it — when your MCP client connects, `uvx` fetches and runs the server.
+(Once published to PyPI, this shortens to `uvx sentinel-suite-mcp` /
+`pip install sentinel-suite-mcp`.)
+
+For the **full** experience (ecc skills, Octogent), clone the repo and point the
+server at it with `SENTINEL_SUITE_ROOT` (see "Connect from a client" below).
+
+### Local dev install
 ```bash
 cd sentinel-suite/mcp-server
 pip install -e .          # or: uvx --from . sentinel-suite-mcp
