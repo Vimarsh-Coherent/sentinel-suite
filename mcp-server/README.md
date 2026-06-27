@@ -21,13 +21,13 @@ client (Claude Code, Cursor, Windsurf, Zed, Continue, …) can connect and use i
 
 ## Install — one line (no clone needed)
 
-The package is self-contained: the **guardrail works standalone**, and the
-ecc / code-graph / orchestrator tools light up automatically if a full checkout
-is present (set `SENTINEL_SUITE_ROOT`).
+One `pip install` ships the **guardrail**, the **full ecc library (271 skills +
+67 agents, bundled into the wheel)**, and pulls **code-review-graph** as a
+dependency. Everything pip can deliver, in one command.
 
 **pip (one line):**
 ```bash
-pip install "git+https://github.com/Vimarsh-Coherent/sentinel-suite#subdirectory=mcp-server"
+pip install "git+https://github.com/Vimarsh-Coherent/sentinel-suite"
 ```
 
 **Connect MCP (auto-installs on connect via uvx — nothing to pip first):**
@@ -37,7 +37,7 @@ pip install "git+https://github.com/Vimarsh-Coherent/sentinel-suite#subdirectory
     "sentinel-suite": {
       "command": "uvx",
       "args": ["--from",
-               "git+https://github.com/Vimarsh-Coherent/sentinel-suite#subdirectory=mcp-server",
+               "git+https://github.com/Vimarsh-Coherent/sentinel-suite",
                "sentinel-suite-mcp"],
       "type": "stdio"
     }
@@ -46,10 +46,17 @@ pip install "git+https://github.com/Vimarsh-Coherent/sentinel-suite#subdirectory
 ```
 That's it — when your MCP client connects, `uvx` fetches and runs the server.
 (Once published to PyPI, this shortens to `uvx sentinel-suite-mcp` /
-`pip install sentinel-suite-mcp`.)
+`pip install sentinel-suite`.)
 
-For the **full** experience (ecc skills, Octogent), clone the repo and point the
-server at it with `SENTINEL_SUITE_ROOT` (see "Connect from a client" below).
+After install you also get a CLI:
+```bash
+sentinel-suite scan --text "ship tengu"     # guardrail
+sentinel-suite init --global-hooks          # no AI attribution on commits, everywhere
+sentinel-suite info                         # what's available
+```
+
+**What still needs a clone:** only the **Orchestrator** (Octogent) — it's a
+Node.js app, so pip can't install it. Everything else works from the pip install.
 
 ### Local dev install
 ```bash

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sentinel-suite"
+version = "0.1.0"
+description = "Sentinel Suite — one-install toolkit for Claude Code: a commit/PR guardrail, graph-based code intelligence, and a large bundled skills/agents library, all exposed via a unified MCP server."
+readme = "mcp-server/README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "micoherent7", email = "micoherent7@gmail.com" }]
+keywords = ["mcp", "claude", "guardrail", "secrets", "code-review", "agents", "skills"]
+dependencies = [
+  "mcp>=1.2",
+  "code-review-graph",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "anyio"]
+
+[project.scripts]
+sentinel-suite-mcp = "sentinel_suite_mcp.server:main"
+sentinel-suite = "sentinel_suite_mcp.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Vimarsh-Coherent/sentinel-suite"
+
+# Include ONLY our package (it lives under mcp-server/src) ...
+[tool.hatch.build.targets.wheel]
+only-include = ["mcp-server/src/sentinel_suite_mcp"]
+sources = ["mcp-server/src"]
+
+# ... and bundle the ecc skills + agents AS package data so `pip install`
+# brings the whole skills/agents library with zero clone.
+[tool.hatch.build.targets.wheel.force-include]
+"vendor/ecc/skills" = "sentinel_suite_mcp/_data/ecc/skills"
+"vendor/ecc/agents" = "sentinel_suite_mcp/_data/ecc/agents"

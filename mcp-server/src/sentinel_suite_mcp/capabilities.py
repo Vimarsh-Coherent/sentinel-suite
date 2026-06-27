@@ -38,8 +38,13 @@ _NO_REPO = ("This needs the full Sentinel Suite checkout. Clone it and set "
 
 
 def _ecc() -> Optional[Path]:
+    # Prefer a full checkout; otherwise use the ecc skills/agents bundled into
+    # the wheel (so a plain `pip install` ships the whole library).
     root = repo_root()
-    return (root / "vendor" / "ecc") if root else None
+    if root and (root / "vendor" / "ecc").is_dir():
+        return root / "vendor" / "ecc"
+    bundled = Path(__file__).resolve().parent / "_data" / "ecc"
+    return bundled if bundled.is_dir() else None
 
 
 # ---------------------------------------------------------------------------
@@ -224,17 +229,18 @@ def octogent_launch_command() -> str:
 def info() -> dict:
     root = repo_root()
     skills = ecc_list_skills()
-    n_skills = 0 if (skills and skills[0].get("name") == "(unavailable)") else len(skills)
+    have_ecc = not (skills and skills[0].get("name") == "(unavailable)")
+    n_skills = len(skills) if have_ecc else 0
     return {
         "name": "sentinel-suite",
         "repo_root": str(root) if root else None,
-        "mode": "full checkout" if root else "standalone (pip) — guardrail only; clone for ecc/orchestrator",
+        "mode": "full checkout" if root else "pip install (ecc bundled; Orchestrator needs clone+Node)",
         "capabilities": {
             "Sentinel Suite Guard": "scan / redact / status (always available)",
-            "Sentinel Suite Skills": (f"{n_skills} skills (powered by ecc)" if root
-                                      else "needs checkout"),
+            "Sentinel Suite Skills": (f"{n_skills} skills, {len(ecc_list_agents())} agents"
+                                      if have_ecc else "unavailable"),
             "Sentinel Suite Graph": "status / build / update (needs code-review-graph CLI)",
             "Sentinel Suite Orchestrator": ("create tentacles; launch dashboard" if root
-                                            else "needs checkout (Node app)"),
+                                            else "tentacles only; launch needs clone+Node"),
         },
     }
