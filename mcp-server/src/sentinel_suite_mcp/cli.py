@@ -68,6 +68,75 @@ def cmd_mcp(a) -> int:
     return server_main([])
 
 
+def cmd_agents(a) -> int:
+    items = cap.ecc_list_agents(a.query or "")
+    if a.json:
+        print(json.dumps(items, indent=2))
+    else:
+        print(f"{len(items)} agent(s):")
+        for it in items:
+            print(f"  • {it['name']:<28} {it['description'][:70]}")
+    return 0
+
+
+def cmd_agent(a) -> int:
+    print(cap.ecc_get_agent(a.name))
+    return 0
+
+
+def cmd_skills(a) -> int:
+    items = cap.ecc_list_skills(a.query or "")
+    if a.json:
+        print(json.dumps(items, indent=2))
+    else:
+        print(f"{len(items)} skill(s):")
+        for it in items:
+            print(f"  • {it['name']:<28} {it['description'][:70]}")
+    return 0
+
+
+def cmd_skill(a) -> int:
+    print(cap.ecc_get_skill(a.name))
+    return 0
+
+
+def _install_dir(kind: str, target: str | None) -> int:
+    import shutil
+    base = cap._ecc()
+    if base is None:
+        print(cap._NO_REPO, file=sys.stderr)
+        return 2
+    src = base / kind  # "agents" or "skills"
+    if not src.is_dir():
+        print(f"no {kind} found in the bundle", file=sys.stderr)
+        return 2
+    dst = Path(target) if target else (Path.cwd() / ".claude" / kind)
+    dst.mkdir(parents=True, exist_ok=True)
+    n = 0
+    if kind == "agents":
+        for f in sorted(src.glob("*.md")):
+            shutil.copy2(f, dst / f.name)
+            n += 1
+    else:  # skills are folders
+        for d in sorted(p for p in src.iterdir() if p.is_dir()):
+            tgt = dst / d.name
+            if tgt.exists():
+                shutil.rmtree(tgt)
+            shutil.copytree(d, tgt)
+            n += 1
+    print(f"✅ installed {n} {kind} -> {dst}")
+    print(f"   Claude Code will pick them up from {dst} (restart the session).")
+    return 0
+
+
+def cmd_install_agents(a) -> int:
+    return _install_dir("agents", a.dir)
+
+
+def cmd_install_skills(a) -> int:
+    return _install_dir("skills", a.dir)
+
+
 def cmd_info(a) -> int:
     print(json.dumps(cap.info(), indent=2))
     return 0
@@ -127,6 +196,33 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("status").set_defaults(func=cmd_status)
     sub.add_parser("info").set_defaults(func=cmd_info)
     sub.add_parser("mcp").set_defaults(func=cmd_mcp)
+
+    # ecc agents / skills: list, view, and install into .claude/
+    sp = sub.add_parser("agents", help="list the bundled ecc agents")
+    sp.add_argument("query", nargs="?", default="")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_agents)
+
+    sp = sub.add_parser("agent", help="print one agent's full definition")
+    sp.add_argument("name")
+    sp.set_defaults(func=cmd_agent)
+
+    sp = sub.add_parser("skills", help="list the bundled ecc skills")
+    sp.add_argument("query", nargs="?", default="")
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_skills)
+
+    sp = sub.add_parser("skill", help="print one skill's full definition")
+    sp.add_argument("name")
+    sp.set_defaults(func=cmd_skill)
+
+    sp = sub.add_parser("install-agents", help="copy all agents into .claude/agents so Claude Code can use them")
+    sp.add_argument("--dir", default=None, help="target dir (default: ./.claude/agents)")
+    sp.set_defaults(func=cmd_install_agents)
+
+    sp = sub.add_parser("install-skills", help="copy all skills into .claude/skills")
+    sp.add_argument("--dir", default=None, help="target dir (default: ./.claude/skills)")
+    sp.set_defaults(func=cmd_install_skills)
 
     sp = sub.add_parser("init", help="opt in: no AI attribution on commits/PRs")
     sp.add_argument("--global-hooks", action="store_true",
