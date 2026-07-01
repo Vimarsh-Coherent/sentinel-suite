@@ -137,6 +137,40 @@ def cmd_install_skills(a) -> int:
     return _install_dir("skills", a.dir)
 
 
+def cmd_setup(a) -> int:
+    """One command to wire ALL of Sentinel Suite into the current project."""
+    print("== Sentinel Suite: setting up this project ==\n")
+
+    # 1. Guardrail opt-in (no AI attribution on commits/PRs)
+    print("[1/4] Guard — attribution-free commits")
+    init_ns = argparse.Namespace(global_hooks=a.global_hooks)
+    cmd_init(init_ns)
+
+    # 2. Install the 67 agents + 271 skills into ./.claude
+    print("\n[2/4] Skills — installing agents + skills into .claude/")
+    _install_dir("agents", None)
+    _install_dir("skills", None)
+
+    # 3. Build the code graph (if the CLI is available)
+    print("\n[3/4] Graph — building the code knowledge graph")
+    try:
+        r = subprocess.run(["code-review-graph", "build"], timeout=600)
+        print("   graph built" if r.returncode == 0 else "   (skipped — build returned non-zero)")
+    except FileNotFoundError:
+        print("   (skipped — install with `pip install code-review-graph`)")
+    except Exception as e:
+        print(f"   (skipped — {e})")
+
+    # 4. Next steps
+    print("\n[4/4] Done. Optional next steps:")
+    print("   • Connect the MCP server — add to your .mcp.json:")
+    print('       { "mcpServers": { "sentinel-suite": { "command": "sentinel-suite-mcp", "type": "stdio" } } }')
+    print("   • Multi-session dashboard:  sentinel-suite orchestrate serve")
+    print("   • Restart Claude Code to load the agents/skills.")
+    print("\n✅ Sentinel Suite is set up. All parts are active in this project.")
+    return 0
+
+
 # ---- orchestrator (Python port of Octogent) --------------------------------
 
 def cmd_orch_serve(a) -> int:
@@ -276,6 +310,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--global-hooks", action="store_true",
                     help="also guard every repo on this machine")
     sp.set_defaults(func=cmd_init)
+
+    sp = sub.add_parser("setup", help="ONE command: wire ALL of Sentinel Suite into this project")
+    sp.add_argument("--global-hooks", action="store_true",
+                    help="also guard every repo on this machine")
+    sp.set_defaults(func=cmd_setup)
 
     # orchestrator (pure-Python port of Octogent)
     orch = sub.add_parser("orchestrate", help="multi-session orchestrator (Python port of Octogent)")
