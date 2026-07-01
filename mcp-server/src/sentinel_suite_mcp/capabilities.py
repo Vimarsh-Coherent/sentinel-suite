@@ -208,17 +208,14 @@ def create_tentacle(name: str, scope: str = "", cwd: Optional[str] = None) -> st
 
 
 def octogent_launch_command() -> str:
-    root = repo_root()
-    if root is None:
-        return ("The Orchestrator (Octogent) is a Node app and needs the full "
-                "checkout.\n" + _NO_REPO + "\nThen run: "
-                "python plugins/orchestrator/scripts/launch_octogent.py "
-                "(needs Node >= 22 and pnpm; dashboard at http://localhost:8787).")
-    launcher = root / "plugins" / "orchestrator" / "scripts" / "launch_octogent.py"
+    # The orchestrator is now a pure-Python port — no Node needed.
     return (
-        f"Run: python \"{launcher}\"\n"
-        "Needs Node >= 22 and pnpm. The dashboard opens at http://localhost:8787.\n"
-        "(Long-running — start it in your own terminal, not via this tool.)"
+        "Sentinel Suite Orchestrator (pure Python — no Node required):\n"
+        "  sentinel-suite orchestrate serve     # dashboard + API at http://127.0.0.1:8787\n"
+        "  sentinel-suite orchestrate new <name>    # create a tentacle\n"
+        "  sentinel-suite orchestrate run <tentacle> <command...>   # start a session\n"
+        "  sentinel-suite orchestrate sessions  # list sessions\n"
+        "(Start `serve` in your own terminal — it's long-running.)"
     )
 
 
@@ -234,13 +231,12 @@ def info() -> dict:
     return {
         "name": "sentinel-suite",
         "repo_root": str(root) if root else None,
-        "mode": "full checkout" if root else "pip install (ecc bundled; Orchestrator needs clone+Node)",
+        "mode": "full checkout" if root else "pip install (everything Python; ecc bundled)",
         "capabilities": {
             "Sentinel Suite Guard": "scan / redact / status (always available)",
             "Sentinel Suite Skills": (f"{n_skills} skills, {len(ecc_list_agents())} agents"
                                       if have_ecc else "unavailable"),
             "Sentinel Suite Graph": "status / build / update (needs code-review-graph CLI)",
-            "Sentinel Suite Orchestrator": ("create tentacles; launch dashboard" if root
-                                            else "tentacles only; launch needs clone+Node"),
+            "Sentinel Suite Orchestrator": "tentacles + sessions + dashboard (pure Python, no Node)",
         },
     }

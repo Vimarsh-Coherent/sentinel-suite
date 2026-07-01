@@ -11,7 +11,7 @@ Sentinel Suite packages four capabilities under one roof and one brand:
 | **Sentinel Suite Guard** | Keeps secrets, internal codenames, unreleased versions, and AI attribution out of commits/PRs | original |
 | **Sentinel Suite Graph** | Token-efficient, graph-based code intelligence (impact radius, architecture, hubs/bridges, semantic search) | [code-review-graph](https://github.com/tirth8205/code-review-graph) (MIT) |
 | **Sentinel Suite Skills** | 67 agents · 271 skills · 92 commands for TDD, security, review, languages | [ecc](https://github.com/affaan-m/ecc) (MIT) |
-| **Sentinel Suite Orchestrator** | Run many Claude Code sessions in parallel as scoped "tentacles" | [Octogent](https://github.com/hesamsheikh/octogent) (MIT) |
+| **Sentinel Suite Orchestrator** | Run many Claude Code sessions in parallel as scoped "tentacles" (tentacles + sessions + local dashboard) | original — pure-Python port of [Octogent](https://github.com/hesamsheikh/octogent)'s core (MIT) |
 | **Sentinel Suite MCP** | One MCP server exposing all of the above as tools | original |
 
 > Sentinel Suite is the unified surface. The "Powered by" projects are bundled
@@ -70,9 +70,16 @@ Tools: `guardrail_scan/redact/status`, `ecc_list_skills/get_skill`,
 
 ## Requirements
 
-- **Python 3.10+** — Guard and the MCP server.
-- **`uv`/`uvx`** — Sentinel Suite Graph (`code-review-graph` server).
-- **Node ≥ 22 + pnpm** — Sentinel Suite Orchestrator (Octogent dashboard).
+- **Python 3.10+** — Guard, MCP server, **and the Orchestrator** (now pure Python — no Node needed).
+- **`uv`/`uvx`** — optional, for Sentinel Suite Graph (`code-review-graph` server).
+
+### Orchestrator (pure Python)
+```bash
+sentinel-suite orchestrate serve            # dashboard + API at http://127.0.0.1:8787
+sentinel-suite orchestrate new frontend --scope "UI work"
+sentinel-suite orchestrate run frontend "claude -p 'add tests'"
+sentinel-suite orchestrate sessions
+```
 
 ## License & attribution
 

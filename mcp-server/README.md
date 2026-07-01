@@ -52,11 +52,19 @@ After install you also get a CLI:
 ```bash
 sentinel-suite scan --text "ship tengu"     # guardrail
 sentinel-suite init --global-hooks          # no AI attribution on commits, everywhere
+sentinel-suite agents / skills              # list the 67 agents / 271 skills
+sentinel-suite install-agents               # register agents into .claude/agents
 sentinel-suite info                         # what's available
+
+# Orchestrator — pure Python, no Node:
+sentinel-suite orchestrate serve            # dashboard + API at http://127.0.0.1:8787
+sentinel-suite orchestrate new frontend --scope "UI"
+sentinel-suite orchestrate run frontend "claude -p 'add tests'"
+sentinel-suite orchestrate sessions
 ```
 
-**What still needs a clone:** only the **Orchestrator** (Octogent) — it's a
-Node.js app, so pip can't install it. Everything else works from the pip install.
+**Everything now installs with pip** — the Orchestrator was ported from Node
+(Octogent) to pure Python, so there are no non-Python requirements.
 
 ### Local dev install
 ```bash

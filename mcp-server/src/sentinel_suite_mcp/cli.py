@@ -137,6 +137,54 @@ def cmd_install_skills(a) -> int:
     return _install_dir("skills", a.dir)
 
 
+# ---- orchestrator (Python port of Octogent) --------------------------------
+
+def cmd_orch_serve(a) -> int:
+    from .orchestrator_server import serve
+    return serve(a.host, a.port, a.root)
+
+
+def cmd_orch_new(a) -> int:
+    from .orchestrator import Orchestrator
+    t = Orchestrator(a.root).create_tentacle(a.name, a.desc or "", a.scope or "")
+    print(f"✅ created tentacle '{t.id}' at {t.path}")
+    return 0
+
+
+def cmd_orch_ls(a) -> int:
+    from .orchestrator import Orchestrator
+    ts = Orchestrator(a.root).list_tentacles()
+    if not ts:
+        print("no tentacles yet (create one with: sentinel-suite orchestrate new <name>)")
+    for t in ts:
+        print(f"  • {t.id}" + (f" — {t.scope}" if t.scope else ""))
+    return 0
+
+
+def cmd_orch_run(a) -> int:
+    from .orchestrator import Orchestrator
+    s = Orchestrator(a.root).spawn_session(a.tentacle, " ".join(a.command))
+    print(f"✅ started session '{s.id}' (pid {s.pid}); log: {s.log}")
+    return 0
+
+
+def cmd_orch_sessions(a) -> int:
+    from .orchestrator import Orchestrator
+    ss = Orchestrator(a.root).list_sessions()
+    if not ss:
+        print("no sessions yet")
+    for s in ss:
+        print(f"  • {s.id}  [{s.status}]  {s.command}")
+    return 0
+
+
+def cmd_orch_stop(a) -> int:
+    from .orchestrator import Orchestrator
+    r = Orchestrator(a.root).stop_session(a.session_id)
+    print(("✅ " if r.get("ok") else "❌ ") + json.dumps(r))
+    return 0 if r.get("ok") else 2
+
+
 def cmd_info(a) -> int:
     print(json.dumps(cap.info(), indent=2))
     return 0
@@ -228,6 +276,42 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--global-hooks", action="store_true",
                     help="also guard every repo on this machine")
     sp.set_defaults(func=cmd_init)
+
+    # orchestrator (pure-Python port of Octogent)
+    orch = sub.add_parser("orchestrate", help="multi-session orchestrator (Python port of Octogent)")
+    osub = orch.add_subparsers(dest="action", required=True)
+
+    sp = osub.add_parser("serve", help="run the local API + dashboard (default :8787)")
+    sp.add_argument("--host", default="127.0.0.1")
+    sp.add_argument("--port", type=int, default=8787)
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_serve)
+
+    sp = osub.add_parser("new", help="create a tentacle (scoped job folder)")
+    sp.add_argument("name")
+    sp.add_argument("--desc", default=None)
+    sp.add_argument("--scope", default=None)
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_new)
+
+    sp = osub.add_parser("ls", help="list tentacles")
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_ls)
+
+    sp = osub.add_parser("run", help="start a background session in a tentacle")
+    sp.add_argument("tentacle")
+    sp.add_argument("command", nargs="+")
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_run)
+
+    sp = osub.add_parser("sessions", help="list sessions")
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_sessions)
+
+    sp = osub.add_parser("stop", help="stop a session")
+    sp.add_argument("session_id")
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_stop)
 
     return p
 

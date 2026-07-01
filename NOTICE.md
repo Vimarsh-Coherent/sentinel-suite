@@ -34,6 +34,11 @@ current version.
 - `plugins/orchestrator/` — glue (skill/command/launcher) for Sentinel Suite
   Orchestrator.
 - `mcp-server/` — **Sentinel Suite MCP**, the unified server.
+- `mcp-server/src/sentinel_suite_mcp/orchestrator.py` + `orchestrator_server.py` —
+  **Sentinel Suite Orchestrator**, an original **pure-Python re-implementation of
+  Octogent's core** (tentacles + sessions + local dashboard). It was written from
+  Octogent's public behaviour/concepts; no upstream TypeScript was copied.
+  `vendor/octogent/` remains bundled for reference and keeps its own MIT license.
 - `.claude-plugin/marketplace.json` — the Sentinel Suite marketplace manifest.
 
 ## Intent
