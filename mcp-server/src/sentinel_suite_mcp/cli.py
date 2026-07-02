@@ -138,6 +138,41 @@ def cmd_install_skills(a) -> int:
     return _install_dir("skills", a.dir)
 
 
+def _install_graph_hooks(project_dir: Optional[str] = None) -> str:
+    """Merge code-review-graph auto-hooks into the project's .claude/settings.json.
+
+    SessionStart -> build/status the graph; after every Edit/Write -> update it.
+    So the graph stays current automatically — you never have to mention it.
+    """
+    settings = Path(project_dir or os.getcwd()) / ".claude" / "settings.json"
+    data: dict = {}
+    if settings.is_file():
+        try:
+            data = json.loads(settings.read_text(encoding="utf-8") or "{}")
+        except json.JSONDecodeError:
+            return f"skipped — {settings} is not valid JSON"
+    hooks = data.setdefault("hooks", {})
+
+    def _has(event: str, cmd_sub: str) -> bool:
+        for grp in hooks.get(event, []):
+            for h in grp.get("hooks", []):
+                if cmd_sub in h.get("command", ""):
+                    return True
+        return False
+
+    if not _has("SessionStart", "code-review-graph"):
+        hooks.setdefault("SessionStart", []).append(
+            {"hooks": [{"type": "command", "command": "code-review-graph status", "timeout": 15}]})
+    if not _has("PostToolUse", "code-review-graph"):
+        hooks.setdefault("PostToolUse", []).append(
+            {"matcher": "Edit|Write",
+             "hooks": [{"type": "command", "command": "code-review-graph update --skip-flows",
+                        "timeout": 30}]})
+    settings.parent.mkdir(parents=True, exist_ok=True)
+    settings.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return f"auto-graph hooks written to {settings}"
+
+
 def cmd_setup(a) -> int:
     """One command to wire ALL of Sentinel Suite into the current project."""
     print("== Sentinel Suite: setting up this project ==\n")
@@ -152,15 +187,18 @@ def cmd_setup(a) -> int:
     _install_dir("agents", None)
     _install_dir("skills", None)
 
-    # 3. Build the code graph (if the CLI is available)
-    print("\n[3/4] Graph — building the code knowledge graph")
+    # 3. Build the code graph AND install auto-hooks so it stays active
+    print("\n[3/4] Graph — building + auto-activating the code knowledge graph")
     try:
         r = subprocess.run(["code-review-graph", "build"], timeout=600)
-        print("   graph built" if r.returncode == 0 else "   (skipped — build returned non-zero)")
+        print("   graph built" if r.returncode == 0 else "   (build returned non-zero)")
     except FileNotFoundError:
-        print("   (skipped — install with `pip install code-review-graph`)")
+        print("   (build skipped — install with `pip install code-review-graph`)")
     except Exception as e:
-        print(f"   (skipped — {e})")
+        print(f"   (build skipped — {e})")
+    print("   " + _install_graph_hooks())
+    print("   → the graph now rebuilds on session start and updates after every edit,")
+    print("     so Claude always has fresh code intelligence without you asking.")
 
     # 4. Next steps
     print("\n[4/4] Done. Optional next steps:")

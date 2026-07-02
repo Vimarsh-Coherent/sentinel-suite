@@ -23,7 +23,12 @@ current version.
 - `vendor/ecc/.claude-plugin/plugin.json` — the plugin `name` and `description`
   fields were changed to present it as "sentinel-skills" within the Sentinel
   Suite marketplace. All upstream authorship, the homepage, the repository URL,
-  and the MIT license are preserved. No other vendored files were modified.
+  and the MIT license are preserved.
+- `vendor/ecc/skills/` — **original Sentinel Suite skills were added** here (e.g.
+  `ci-cd-pipeline`, `infrastructure-as-code`, `auth-oauth-jwt`, `graphql-api`,
+  `observability`, `ruby-rails-patterns`, and more) to fill software-development
+  gaps. These added skill folders are original work (© micoherent7, MIT); the
+  upstream ecc skills are unchanged.
 
 ## Original Sentinel Suite code (MIT, © micoherent7)
 
