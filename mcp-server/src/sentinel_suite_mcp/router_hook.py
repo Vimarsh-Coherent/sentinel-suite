@@ -15,7 +15,8 @@ import json
 import sys
 
 # Only suggest when the match is clearly relevant (avoid noise on every prompt).
-MIN_SCORE = 4
+# Scores are TF-IDF cosine similarities (0..1), so this is a small positive cutoff.
+MIN_SCORE = 0.15
 
 
 def main() -> int:
