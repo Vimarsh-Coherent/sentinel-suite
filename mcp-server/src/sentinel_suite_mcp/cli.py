@@ -408,6 +408,17 @@ def cmd_skill_new(a) -> int:
     return 0
 
 
+def cmd_connect(a) -> int:
+    from . import adapters
+    res = adapters.connect(a.target, root=a.root)
+    for tool, files in res.items():
+        print(f"✅ {tool}:")
+        for f in files:
+            print(f"   - {f}")
+    print("\nRestart the tool so it picks up the MCP server + rules.")
+    return 0
+
+
 def cmd_info(a) -> int:
     print(json.dumps(cap.info(), indent=2))
     return 0
@@ -521,6 +532,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--description", default=None)
     sp.add_argument("--body", default=None)
     sp.set_defaults(func=cmd_skill_new)
+
+    sp = sub.add_parser("connect", help="wire Sentinel Suite into another tool (Cursor/Windsurf/Zed/Claude)")
+    sp.add_argument("--target", required=True,
+                    choices=["claude", "cursor", "windsurf", "zed", "all"])
+    sp.add_argument("--root", default=None, help="SENTINEL_SUITE_ROOT for full checkout features")
+    sp.set_defaults(func=cmd_connect)
 
     # orchestrator (pure-Python port of Octogent)
     orch = sub.add_parser("orchestrate", help="multi-session orchestrator (Python port of Octogent)")
