@@ -108,6 +108,18 @@ def test_cli_scan_exit_code():
     assert r2.returncode == 0
 
 
+def test_detects_secrets():
+    rules = uc.build_rules()
+    cats = {f.category for f in uc.scan("deploy AKIAABCDEFGHIJKLMNOP and password=hunter2secret", rules)}
+    assert "secret" in cats
+
+
+def test_credit_card_luhn():
+    rules = uc.build_rules()
+    assert any(f.category == "pii" for f in uc.scan("card 4111 1111 1111 1111", rules))
+    assert not any(f.category == "pii" for f in uc.scan("id 1234 5678 9012 3456", rules))
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     passed = 0

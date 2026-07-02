@@ -57,7 +57,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Callable, List, Optional, Sequence
 
 # ---------------------------------------------------------------------------
 # Configuration / environment knobs
@@ -94,6 +94,22 @@ class Rule:
     # If True the *whole matched line* is dropped (used for attribution lines).
     drop_line: bool = False
     replacement: str = "[REDACTED]"
+    # Optional check to cut false positives (e.g. Luhn for card numbers).
+    validator: Optional[Callable[[str], bool]] = field(default=None, compare=False)
+
+
+def _luhn_ok(s: str) -> bool:
+    digits = [int(c) for c in s if c.isdigit()]
+    if not 13 <= len(digits) <= 19:
+        return False
+    total, parity = 0, len(digits) % 2
+    for i, d in enumerate(digits):
+        if i % 2 == parity:
+            d *= 2
+            if d > 9:
+                d -= 9
+        total += d
+    return total % 10 == 0
 
 
 # Built-in codenames / terms. Extend via an `.undercover.json` config (see
@@ -119,6 +135,36 @@ def build_rules(extra_terms: Optional[Sequence[str]] = None) -> List[Rule]:
     """Construct the full rule set (optionally augmented with custom terms)."""
     codenames = list(INTERNAL_CODENAMES) + list(extra_terms or [])
     rules: List[Rule] = [
+        # ---- secrets / credentials (should never be committed) ----
+        Rule("private-key", "secret",
+             re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----"),
+             "private key block"),
+        Rule("aws-access-key", "secret",
+             re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"), "AWS access key id"),
+        Rule("github-token", "secret",
+             re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b"), "GitHub token"),
+        Rule("slack-token", "secret",
+             re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"), "Slack token"),
+        Rule("google-api-key", "secret",
+             re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b"), "Google API key"),
+        Rule("stripe-key", "secret",
+             re.compile(r"\b[sr]k_(?:live|test)_[0-9A-Za-z]{16,}\b"), "Stripe secret key"),
+        Rule("anthropic-key", "secret",
+             re.compile(r"\bsk-ant-[A-Za-z0-9_\-]{20,}\b"), "Anthropic API key"),
+        Rule("openai-key", "secret",
+             re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9]{20,}\b"), "OpenAI API key"),
+        Rule("jwt", "secret",
+             re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{6,}\b"),
+             "JSON Web Token"),
+        Rule("generic-secret", "secret",
+             re.compile(r"""(?ix)\b(?:api[_-]?key|secret|token|passwd|password|
+                        access[_-]?key|client[_-]?secret)\b\s*[:=]\s*
+                        ["']?[A-Za-z0-9_\-./+=]{8,}["']?"""),
+             "hardcoded secret assignment"),
+        Rule("credit-card", "pii",
+             re.compile(r"\b(?:\d[ -]?){13,19}\b"),
+             "possible credit-card number", validator=_luhn_ok),
+        # ---- internal info / AI attribution (undercover) ----
         Rule(
             "attribution",
             "attribution",
@@ -212,6 +258,8 @@ def scan(text: str, rules: Optional[Sequence[Rule]] = None) -> List[Finding]:
     findings: List[Finding] = []
     for rule in rules:
         for m in rule.pattern.finditer(text):
+            if rule.validator and not rule.validator(m.group(0)):
+                continue
             findings.append(
                 Finding(
                     rule=rule.name,
