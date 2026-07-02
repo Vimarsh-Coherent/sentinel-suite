@@ -18,50 +18,66 @@ DASHBOARD = """<!doctype html>
 <html><head><meta charset="utf-8"><title>Sentinel Suite Orchestrator</title>
 <style>
  body{font-family:system-ui,Segoe UI,Arial;margin:0;background:#0f1115;color:#e6e6e6}
- header{padding:16px 24px;background:#161a22;border-bottom:1px solid #262b36}
- h1{font-size:18px;margin:0}
+ header{padding:14px 24px;background:#161a22;border-bottom:1px solid #262b36;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+ h1{font-size:17px;margin:0}
+ .stat{font-size:12px;color:#9aa4b2}.stat b{color:#e6e6e6;font-size:15px}
  main{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:24px}
  .card{background:#161a22;border:1px solid #262b36;border-radius:10px;padding:16px}
- h2{font-size:14px;color:#9aa4b2;margin:0 0 12px}
+ h2{font-size:13px;color:#9aa4b2;margin:0 0 12px;text-transform:uppercase;letter-spacing:.5px}
  .item{border:1px solid #262b36;border-radius:8px;padding:10px;margin-bottom:8px}
  .id{font-weight:600}
  .muted{color:#8892a0;font-size:12px}
+ .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+ .on{background:#5ad19a;box-shadow:0 0 8px #5ad19a}.off{background:#4b5565}
  .run{color:#5ad19a}.fin{color:#8892a0}
- input,button,textarea{background:#0f1115;color:#e6e6e6;border:1px solid #2a3140;border-radius:6px;padding:8px;font-size:13px}
+ .msg{border-left:3px solid #2563eb;padding:6px 10px;margin-bottom:6px;background:#12161f;border-radius:0 6px 6px 0}
+ .bcast{border-left-color:#d19a5a}
+ input,button{background:#0f1115;color:#e6e6e6;border:1px solid #2a3140;border-radius:6px;padding:8px;font-size:13px}
  button{cursor:pointer;background:#2563eb;border-color:#2563eb}
  form{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 </style></head><body>
-<header><h1>🐙 Sentinel Suite Orchestrator <span class="muted" id="proj"></span></h1></header>
+<header>
+ <h1>🐙 Sentinel Suite — Team</h1>
+ <span class="stat" id="proj"></span>
+ <span class="stat"><b id="nw">0</b> members</span>
+ <span class="stat"><b id="nr">0</b> working</span>
+ <span class="stat"><b id="nm">0</b> messages</span>
+</header>
 <main>
- <div class="card"><h2>Tentacles</h2><div id="tentacles"></div>
+ <div class="card"><h2>Team members</h2><div id="team"></div>
   <form onsubmit="return newTentacle(event)">
-   <input id="tname" placeholder="name" required>
+   <input id="tname" placeholder="new member name" required>
    <input id="tscope" placeholder="scope (optional)">
-   <button>Create tentacle</button></form></div>
- <div class="card"><h2>Sessions</h2><div id="sessions"></div>
-  <form onsubmit="return runSession(event)">
-   <input id="stent" placeholder="tentacle id" required>
-   <input id="scmd" placeholder="command (e.g. claude -p 'do X')" required style="flex:1">
-   <button>Start session</button></form></div>
- <div class="card" style="grid-column:1/-1"><h2>Messages (inter-agent)</h2><div id="messages"></div>
+   <button>Add</button></form></div>
+ <div class="card"><h2>Conversation</h2><div id="messages"></div>
   <form onsubmit="return sendMsg(event)">
-   <input id="mfrom" placeholder="from" required>
-   <input id="mto" placeholder="to (tentacle id or 'all')" required>
+   <input id="mfrom" placeholder="from" required style="width:90px">
+   <input id="mto" placeholder="to / all" required style="width:90px">
    <input id="mbody" placeholder="message" required style="flex:1">
    <button>Send</button></form></div>
 </main>
 <script>
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 async function load(){
- const r=await fetch('/api/state'); const s=await r.json();
- document.getElementById('proj').textContent = s.project;
- document.getElementById('tentacles').innerHTML = s.tentacles.map(t=>
-   `<div class="item"><div class="id">${t.id}</div><div class="muted">${t.scope||''}</div></div>`).join('')||'<div class="muted">none yet</div>';
- document.getElementById('sessions').innerHTML = s.sessions.map(x=>
-   `<div class="item"><div class="id">${x.id} <span class="${x.status==='running'?'run':'fin'}">${x.status}</span></div>
-    <div class="muted">${x.command}</div>
-    ${x.status==='running'?`<button onclick="stop('${x.id}')">stop</button>`:''}</div>`).join('')||'<div class="muted">none yet</div>';
- document.getElementById('messages').innerHTML = (s.messages||[]).map(m=>
-   `<div class="item"><div class="id">${m.sender} → ${m.recipient}</div><div>${m.body}</div></div>`).join('')||'<div class="muted">no messages yet</div>';
+ const s = await (await fetch('/api/state')).json();
+ proj.textContent = s.project;
+ const running = s.sessions.filter(x=>x.status==='running');
+ nw.textContent = s.tentacles.length; nr.textContent = running.length; nm.textContent = (s.messages||[]).length;
+ // team members: each tentacle + whether it has a running session (its worker)
+ team.innerHTML = s.tentacles.map(t=>{
+   const mine = s.sessions.filter(x=>x.tentacle===t.id);
+   const live = mine.some(x=>x.status==='running');
+   const last = (s.messages||[]).filter(m=>m.recipient===t.id||m.sender===t.id).slice(-1)[0];
+   return `<div class="item"><div class="id"><span class="dot ${live?'on':'off'}"></span>${esc(t.id)}
+     <span class="muted">${live?'working':'idle'}</span></div>
+     <div class="muted">${esc(t.scope||'')}</div>
+     ${last?`<div class="muted">last: ${esc(last.sender)}→${esc(last.recipient)}: ${esc(last.body).slice(0,60)}</div>`:''}
+     ${live?mine.filter(x=>x.status==='running').map(x=>`<button onclick="stop('${x.id}')">stop</button>`).join(''):''}</div>`;
+ }).join('')||'<div class="muted">no members yet — add one or run: orchestrate team frontend backend</div>';
+ // conversation, newest first
+ messages.innerHTML = (s.messages||[]).slice().reverse().map(m=>
+   `<div class="msg ${m.recipient==='all'?'bcast':''}"><div class="id">${esc(m.sender)} → ${esc(m.recipient)}</div><div>${esc(m.body)}</div></div>`
+ ).join('')||'<div class="muted">no messages yet</div>';
 }
 async function sendMsg(e){e.preventDefault();
  await fetch('/api/messages',{method:'POST',headers:{'content-type':'application/json'},
@@ -69,11 +85,8 @@ async function sendMsg(e){e.preventDefault();
 async function newTentacle(e){e.preventDefault();
  await fetch('/api/tentacles',{method:'POST',headers:{'content-type':'application/json'},
   body:JSON.stringify({name:tname.value,scope:tscope.value})}); tname.value='';tscope.value=''; load(); return false;}
-async function runSession(e){e.preventDefault();
- await fetch('/api/sessions',{method:'POST',headers:{'content-type':'application/json'},
-  body:JSON.stringify({tentacle:stent.value,command:scmd.value})}); scmd.value=''; load(); return false;}
 async function stop(id){await fetch('/api/sessions/'+id+'/stop',{method:'POST'}); load();}
-load(); setInterval(load, 3000);
+load(); setInterval(load, 2000);
 </script></body></html>"""
 
 
