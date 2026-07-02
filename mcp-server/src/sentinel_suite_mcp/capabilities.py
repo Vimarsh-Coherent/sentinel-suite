@@ -185,11 +185,58 @@ def _score(prompt_toks: set, name: str, desc: str) -> int:
     return 2 * len(prompt_toks & _tokens(name)) + len(prompt_toks & _tokens(desc))
 
 
+def _index_signature() -> int:
+    """Cheap fingerprint of the skill/agent set (entry counts) to invalidate cache."""
+    n = 0
+    ecc = _ecc()
+    for sub in ("skills", "agents"):
+        d = (ecc / sub) if ecc else None
+        if d and d.is_dir():
+            n += sum(1 for _ in d.iterdir())
+    return n
+
+
+def _index_path() -> Path:
+    import tempfile
+    return Path(tempfile.gettempdir()) / "sentinel_suite_router_index.json"
+
+
+def get_router_index() -> dict:
+    """Cached {agents, skills} list so the per-prompt hook stays fast.
+
+    Rebuilds only when the number of skills/agents changes (or cache is missing).
+    """
+    import json as _json
+    sig = _index_signature()
+    p = _index_path()
+    if p.is_file():
+        try:
+            data = _json.loads(p.read_text(encoding="utf-8"))
+            if data.get("sig") == sig:
+                return data
+        except Exception:
+            pass
+    data = {"sig": sig, "agents": ecc_list_agents(), "skills": ecc_list_skills()}
+    try:
+        p.write_text(_json.dumps(data), encoding="utf-8")
+    except Exception:
+        pass
+    return data
+
+
+def clear_router_cache() -> None:
+    try:
+        _index_path().unlink()
+    except Exception:
+        pass
+
+
 def recommend(prompt: str, kind: str = "both", top: int = 5) -> dict:
     """Given a natural-language prompt, return the best-matching agents/skills.
 
     `kind` is "both" | "agents" | "skills". Scores by keyword overlap against
     each item's name (weighted) + description. Items with score 0 are dropped.
+    Uses a cached index so it's fast enough to run on every prompt.
     """
     ptoks = _tokens(prompt)
     out: dict = {"prompt": prompt, "agents": [], "skills": []}
@@ -203,10 +250,11 @@ def recommend(prompt: str, kind: str = "both", top: int = 5) -> dict:
         return [{"name": it["name"], "description": it.get("description", ""), "score": s}
                 for s, it in scored[:top]]
 
+    index = get_router_index()
     if kind in ("both", "agents"):
-        out["agents"] = rank(ecc_list_agents())
+        out["agents"] = rank(index.get("agents", []))
     if kind in ("both", "skills"):
-        out["skills"] = rank(ecc_list_skills())
+        out["skills"] = rank(index.get("skills", []))
     return out
 
 
@@ -226,6 +274,7 @@ def create_skill(name: str, description: str, instructions: str = "",
     content = f"---\nname: {slug}\ndescription: {description}\n---\n\n# {name}\n\n{body}\n"
     path = base / "SKILL.md"
     path.write_text(content, encoding="utf-8")
+    clear_router_cache()
     return {"created": str(path), "name": slug}
 
 

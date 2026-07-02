@@ -173,6 +173,28 @@ def _install_graph_hooks(project_dir: Optional[str] = None) -> str:
     return f"auto-graph hooks written to {settings}"
 
 
+def _install_router_hook(project_dir: Optional[str] = None) -> str:
+    """Merge the auto-router UserPromptSubmit hook into .claude/settings.json."""
+    settings = Path(project_dir or os.getcwd()) / ".claude" / "settings.json"
+    data: dict = {}
+    if settings.is_file():
+        try:
+            data = json.loads(settings.read_text(encoding="utf-8") or "{}")
+        except json.JSONDecodeError:
+            return f"skipped — {settings} is not valid JSON"
+    hooks = data.setdefault("hooks", {})
+    for grp in hooks.get("UserPromptSubmit", []):
+        for h in grp.get("hooks", []):
+            if "router_hook" in h.get("command", ""):
+                return "auto-router already enabled"
+    hooks.setdefault("UserPromptSubmit", []).append(
+        {"hooks": [{"type": "command",
+                    "command": "python -m sentinel_suite_mcp.router_hook", "timeout": 15}]})
+    settings.parent.mkdir(parents=True, exist_ok=True)
+    settings.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return f"auto-router hook written to {settings}"
+
+
 def cmd_setup(a) -> int:
     """One command to wire ALL of Sentinel Suite into the current project."""
     print("== Sentinel Suite: setting up this project ==\n")
@@ -199,6 +221,13 @@ def cmd_setup(a) -> int:
     print("   " + _install_graph_hooks())
     print("   → the graph now rebuilds on session start and updates after every edit,")
     print("     so Claude always has fresh code intelligence without you asking.")
+
+    # 4. Auto-router (announces the best agent/skill for each prompt)
+    if not a.no_auto_router:
+        print("\n[4/4] Auto-router — suggest the best agent/skill on every prompt")
+        print("   " + _install_router_hook())
+        print("   → on each prompt, Claude will say which agent/skill it's using")
+        print("     (you can say 'no' to skip). Disable with: setup --no-auto-router")
 
     # 4. Next steps
     print("\n[4/4] Done. Optional next steps:")
@@ -431,6 +460,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("setup", help="ONE command: wire ALL of Sentinel Suite into this project")
     sp.add_argument("--global-hooks", action="store_true",
                     help="also guard every repo on this machine")
+    sp.add_argument("--no-auto-router", action="store_true",
+                    help="don't install the per-prompt agent/skill auto-router hook")
     sp.set_defaults(func=cmd_setup)
 
     sp = sub.add_parser("recommend", help="given a prompt, suggest the best agent(s)/skill(s)")
