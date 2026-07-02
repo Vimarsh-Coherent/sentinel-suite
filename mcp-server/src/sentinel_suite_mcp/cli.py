@@ -316,6 +316,48 @@ def cmd_orch_messages(a) -> int:
     return 0
 
 
+def cmd_orch_team(a) -> int:
+    """Spin up a coordinator + N workers, each already in auto-inbox mode."""
+    from .orchestrator import Orchestrator
+    o = Orchestrator(a.root)
+    handler = a.handler or 'claude -p "{body}"'
+    coord = a.coordinator
+
+    o.create_tentacle(coord, scope="assigns work + collects results")
+    print(f"👥 team in {o.root}\n  coordinator: {coord}")
+    for w in a.workers:
+        o.create_tentacle(w)
+        watch_cmd = (
+            f'"{sys.executable}" -m sentinel_suite_mcp.cli orchestrate watch {w} '
+            f'--on-message "{handler}" --root "{o.root}"'
+        )
+        if a.dry_run:
+            print(f"  worker {w}: [dry-run] would run -> {watch_cmd}")
+        else:
+            s = o.spawn_session(w, watch_cmd)
+            print(f"  worker {w}: watching (session {s.id}, pid {s.pid})")
+
+    print("\nTalk to the team:")
+    print(f"  sentinel-suite orchestrate send {coord} {a.workers[0] if a.workers else '<worker>'} \"do X\" --root \"{o.root}\"")
+    print(f"  sentinel-suite orchestrate messages --root \"{o.root}\"")
+    print("Tear down:  sentinel-suite orchestrate stop-all --root \"" + str(o.root) + "\"")
+    return 0
+
+
+def cmd_orch_stop_all(a) -> int:
+    from .orchestrator import Orchestrator
+    o = Orchestrator(a.root)
+    stopped = 0
+    for s in o.list_sessions():
+        if s.status == "running":
+            r = o.stop_session(s.id)
+            if r.get("ok"):
+                stopped += 1
+                print(f"  stopped {s.id}")
+    print(f"✅ stopped {stopped} running session(s)")
+    return 0
+
+
 def cmd_orch_watch(a) -> int:
     """Auto-inbox: poll a tentacle's inbox; print (and optionally run a handler)."""
     from .orchestrator import Orchestrator
@@ -533,6 +575,19 @@ def build_parser() -> argparse.ArgumentParser:
     sp = osub.add_parser("messages", help="show all messages")
     sp.add_argument("--root", default=None)
     sp.set_defaults(func=cmd_orch_messages)
+
+    sp = osub.add_parser("team", help="spin up a coordinator + N workers in auto-inbox mode")
+    sp.add_argument("workers", nargs="+", help="worker tentacle names (e.g. frontend backend docs)")
+    sp.add_argument("--coordinator", default="coordinator")
+    sp.add_argument("--handler", default=None,
+                    help='per-message command (default: claude -p "{body}")')
+    sp.add_argument("--dry-run", action="store_true")
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_team)
+
+    sp = osub.add_parser("stop-all", help="stop all running sessions")
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_stop_all)
 
     sp = osub.add_parser("watch", help="auto-inbox: poll a tentacle's inbox and act on messages")
     sp.add_argument("tentacle")

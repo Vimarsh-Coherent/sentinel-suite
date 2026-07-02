@@ -65,6 +65,18 @@ def test_watch_once(tmp_path):
     assert o.inbox("frontend", unread_only=True) == []
 
 
+def test_team_dry_run(tmp_path):
+    import argparse
+    from sentinel_suite_mcp.cli import cmd_orch_team
+    ns = argparse.Namespace(workers=["frontend", "backend"], coordinator="coordinator",
+                            handler=None, dry_run=True, root=str(tmp_path))
+    assert cmd_orch_team(ns) == 0
+    ids = [t.id for t in Orchestrator(str(tmp_path)).list_tentacles()]
+    assert {"coordinator", "frontend", "backend"} <= set(ids)
+    # dry-run must not spawn any real sessions
+    assert Orchestrator(str(tmp_path)).list_sessions() == []
+
+
 def test_http_api(tmp_path):
     o = Orchestrator(str(tmp_path))
     o.scaffold()
