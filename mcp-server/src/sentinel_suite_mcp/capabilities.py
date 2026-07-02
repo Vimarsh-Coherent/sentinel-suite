@@ -207,6 +207,19 @@ def create_tentacle(name: str, scope: str = "", cwd: Optional[str] = None) -> st
     return f"created tentacle '{safe}' at {base}"
 
 
+def orchestrate_send(sender: str, recipient: str, body: str, subject: str = "",
+                     cwd: Optional[str] = None) -> dict:
+    from .orchestrator import Orchestrator
+    m = Orchestrator(cwd or os.getcwd()).send_message(sender, recipient, body, subject)
+    return m.__dict__
+
+
+def orchestrate_inbox(recipient: str, unread_only: bool = False,
+                      cwd: Optional[str] = None) -> list[dict]:
+    from .orchestrator import Orchestrator
+    return [m.__dict__ for m in Orchestrator(cwd or os.getcwd()).inbox(recipient, unread_only)]
+
+
 def octogent_launch_command() -> str:
     # The orchestrator is now a pure-Python port — no Node needed.
     return (

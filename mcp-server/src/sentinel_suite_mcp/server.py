@@ -96,9 +96,22 @@ def create_tentacle(name: str, scope: str = "") -> str:
 
 @mcp.tool()
 def octogent_launch_command() -> str:
-    """Return the command to launch the Octogent dashboard (long-running; run it
-    in your own terminal)."""
+    """Return the command to launch the orchestrator dashboard (long-running; run
+    it in your own terminal)."""
     return cap.octogent_launch_command()
+
+
+@mcp.tool()
+def orchestrate_send(sender: str, recipient: str, body: str, subject: str = "") -> dict:
+    """Send an inter-agent message to a tentacle (or 'all' to broadcast). Use this
+    to coordinate between parallel sessions."""
+    return cap.orchestrate_send(sender, recipient, body, subject)
+
+
+@mcp.tool()
+def orchestrate_inbox(recipient: str, unread_only: bool = False) -> list[dict]:
+    """Read inter-agent messages addressed to a tentacle (plus broadcasts)."""
+    return cap.orchestrate_inbox(recipient, unread_only)
 
 
 # ---- meta -------------------------------------------------------------------

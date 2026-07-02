@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 from .orchestrator import Orchestrator
 
@@ -43,6 +43,12 @@ DASHBOARD = """<!doctype html>
    <input id="stent" placeholder="tentacle id" required>
    <input id="scmd" placeholder="command (e.g. claude -p 'do X')" required style="flex:1">
    <button>Start session</button></form></div>
+ <div class="card" style="grid-column:1/-1"><h2>Messages (inter-agent)</h2><div id="messages"></div>
+  <form onsubmit="return sendMsg(event)">
+   <input id="mfrom" placeholder="from" required>
+   <input id="mto" placeholder="to (tentacle id or 'all')" required>
+   <input id="mbody" placeholder="message" required style="flex:1">
+   <button>Send</button></form></div>
 </main>
 <script>
 async function load(){
@@ -54,7 +60,12 @@ async function load(){
    `<div class="item"><div class="id">${x.id} <span class="${x.status==='running'?'run':'fin'}">${x.status}</span></div>
     <div class="muted">${x.command}</div>
     ${x.status==='running'?`<button onclick="stop('${x.id}')">stop</button>`:''}</div>`).join('')||'<div class="muted">none yet</div>';
+ document.getElementById('messages').innerHTML = (s.messages||[]).map(m=>
+   `<div class="item"><div class="id">${m.sender} → ${m.recipient}</div><div>${m.body}</div></div>`).join('')||'<div class="muted">no messages yet</div>';
 }
+async function sendMsg(e){e.preventDefault();
+ await fetch('/api/messages',{method:'POST',headers:{'content-type':'application/json'},
+  body:JSON.stringify({sender:mfrom.value,recipient:mto.value,body:mbody.value})}); mbody.value=''; load(); return false;}
 async function newTentacle(e){e.preventDefault();
  await fetch('/api/tentacles',{method:'POST',headers:{'content-type':'application/json'},
   body:JSON.stringify({name:tname.value,scope:tscope.value})}); tname.value='';tscope.value=''; load(); return false;}
@@ -100,6 +111,11 @@ def make_handler(orch: Orchestrator):
                 self._json([t.__dict__ for t in orch.list_tentacles()])
             elif path == "/api/sessions":
                 self._json([s.__dict__ for s in orch.list_sessions()])
+            elif path == "/api/messages":
+                q = parse_qs(urlparse(self.path).query)
+                to = (q.get("to") or [None])[0]
+                msgs = orch.inbox(to) if to else orch._all_messages()
+                self._json([m.__dict__ for m in msgs])
             else:
                 self._json({"error": "not found"}, 404)
 
@@ -116,6 +132,10 @@ def make_handler(orch: Orchestrator):
             elif path.startswith("/api/sessions/") and path.endswith("/stop"):
                 sid = path[len("/api/sessions/"):-len("/stop")]
                 self._json(orch.stop_session(sid))
+            elif path == "/api/messages":
+                m = orch.send_message(body.get("sender", ""), body.get("recipient", ""),
+                                      body.get("body", ""), body.get("subject", ""))
+                self._json(m.__dict__, 201)
             else:
                 self._json({"error": "not found"}, 404)
 

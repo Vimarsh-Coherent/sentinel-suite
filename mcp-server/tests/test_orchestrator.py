@@ -41,6 +41,18 @@ def test_session_lifecycle(tmp_path):
     assert r["ok"] is True
 
 
+def test_messaging(tmp_path):
+    o = Orchestrator(str(tmp_path))
+    m = o.send_message("coordinator", "Frontend", "add the header")
+    assert o.inbox("frontend")[0].body == "add the header"
+    # broadcast reaches every tentacle
+    o.send_message("coordinator", "all", "broadcast hi")
+    assert any(x.body == "broadcast hi" for x in o.inbox("backend"))
+    # mark read removes it from the unread view
+    assert o.mark_read(m.id)
+    assert m.id not in [x.id for x in o.inbox("frontend", unread_only=True)]
+
+
 def test_http_api(tmp_path):
     o = Orchestrator(str(tmp_path))
     o.scaffold()

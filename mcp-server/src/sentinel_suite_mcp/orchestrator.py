@@ -27,6 +27,7 @@ import signal
 import subprocess
 import sys
 import time
+import uuid
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional
@@ -88,6 +89,17 @@ class Session:
     status: str = "running"
 
 
+@dataclass
+class Message:
+    id: str
+    sender: str
+    recipient: str        # a tentacle id, or "all" to broadcast
+    subject: str
+    body: str
+    ts: float
+    read: bool = False
+
+
 # ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
@@ -101,10 +113,11 @@ class Orchestrator:
         self.tentacles_dir = self.base / "tentacles"
         self.sessions_dir = self.base / "sessions"
         self.worktrees_dir = self.base / "worktrees"
+        self.messages_dir = self.base / "messages"
 
     # ---- scaffold -------------------------------------------------------
     def scaffold(self) -> dict:
-        for d in (self.tentacles_dir, self.sessions_dir, self.worktrees_dir):
+        for d in (self.tentacles_dir, self.sessions_dir, self.worktrees_dir, self.messages_dir):
             d.mkdir(parents=True, exist_ok=True)
         meta = self.base / "project.json"
         if not meta.is_file():
@@ -209,10 +222,52 @@ class Orchestrator:
                 return {"ok": False, "error": str(e)}
         return {"ok": True, "stopped": session_id}
 
+    # ---- messages (inter-agent messaging) -------------------------------
+    def send_message(self, sender: str, recipient: str, body: str, subject: str = "") -> Message:
+        self.scaffold()
+        rid = "all" if str(recipient).strip().lower() == "all" else _slug(recipient)
+        m = Message(id=uuid.uuid4().hex[:8], sender=_slug(sender), recipient=rid,
+                    subject=subject, body=body, ts=self._now(), read=False)
+        (self.messages_dir / f"{m.id}.json").write_text(
+            json.dumps(asdict(m), indent=2), encoding="utf-8")
+        return m
+
+    def _all_messages(self) -> list[Message]:
+        if not self.messages_dir.is_dir():
+            return []
+        out: list[Message] = []
+        for f in self.messages_dir.glob("*.json"):
+            try:
+                out.append(Message(**json.loads(f.read_text(encoding="utf-8"))))
+            except Exception:
+                continue
+        out.sort(key=lambda m: m.ts)
+        return out
+
+    def inbox(self, recipient: str, unread_only: bool = False) -> list[Message]:
+        rid = _slug(recipient)
+        out = []
+        for m in self._all_messages():
+            if m.recipient in (rid, "all"):
+                if unread_only and m.read:
+                    continue
+                out.append(m)
+        return out
+
+    def mark_read(self, message_id: str) -> bool:
+        f = self.messages_dir / f"{message_id}.json"
+        if not f.is_file():
+            return False
+        m = Message(**json.loads(f.read_text(encoding="utf-8")))
+        m.read = True
+        f.write_text(json.dumps(asdict(m), indent=2), encoding="utf-8")
+        return True
+
     def summary(self) -> dict:
         return {
             "project": self.root.name,
             "root": str(self.root),
             "tentacles": [asdict(t) for t in self.list_tentacles()],
             "sessions": [asdict(s) for s in self.list_sessions()],
+            "messages": [asdict(m) for m in self._all_messages()],
         }

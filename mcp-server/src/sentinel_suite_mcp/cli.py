@@ -219,6 +219,35 @@ def cmd_orch_stop(a) -> int:
     return 0 if r.get("ok") else 2
 
 
+def cmd_orch_send(a) -> int:
+    from .orchestrator import Orchestrator
+    m = Orchestrator(a.root).send_message(a.sender, a.recipient, " ".join(a.message), a.subject or "")
+    print(f"✅ message {m.id} sent: {m.sender} → {m.recipient}")
+    return 0
+
+
+def cmd_orch_inbox(a) -> int:
+    from .orchestrator import Orchestrator
+    msgs = Orchestrator(a.root).inbox(a.recipient, a.unread)
+    if not msgs:
+        print(f"no messages for '{a.recipient}'")
+    for m in msgs:
+        mark = "  " if m.read else "* "
+        subj = f"({m.subject}) " if m.subject else ""
+        print(f"{mark}[{m.id}] {m.sender} → {m.recipient}: {subj}{m.body}")
+    return 0
+
+
+def cmd_orch_messages(a) -> int:
+    from .orchestrator import Orchestrator
+    msgs = Orchestrator(a.root)._all_messages()
+    if not msgs:
+        print("no messages yet")
+    for m in msgs:
+        print(f"  [{m.id}] {m.sender} → {m.recipient}: {m.body}")
+    return 0
+
+
 def cmd_info(a) -> int:
     print(json.dumps(cap.info(), indent=2))
     return 0
@@ -351,6 +380,24 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("session_id")
     sp.add_argument("--root", default=None)
     sp.set_defaults(func=cmd_orch_stop)
+
+    sp = osub.add_parser("send", help="send a message to a tentacle (or 'all')")
+    sp.add_argument("sender")
+    sp.add_argument("recipient")
+    sp.add_argument("message", nargs="+")
+    sp.add_argument("--subject", default=None)
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_send)
+
+    sp = osub.add_parser("inbox", help="read messages for a tentacle")
+    sp.add_argument("recipient")
+    sp.add_argument("--unread", action="store_true")
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_inbox)
+
+    sp = osub.add_parser("messages", help="show all messages")
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_messages)
 
     return p
 
