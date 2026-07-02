@@ -341,7 +341,8 @@ def cmd_orch_watch(a) -> int:
 # ---- router + skill authoring ----------------------------------------------
 
 def cmd_recommend(a) -> int:
-    rec = cap.recommend(" ".join(a.prompt), a.kind, a.top)
+    rec = cap.recommend(" ".join(a.prompt), a.kind, a.top,
+                        method="embed" if a.embed else "tfidf")
     if a.json:
         print(json.dumps(rec, indent=2))
         return 0
@@ -468,6 +469,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("prompt", nargs="+")
     sp.add_argument("--kind", choices=["both", "agents", "skills"], default="both")
     sp.add_argument("--top", type=int, default=5)
+    sp.add_argument("--embed", action="store_true",
+                    help="use true embeddings (needs the 'embeddings' extra)")
     sp.add_argument("--json", action="store_true")
     sp.set_defaults(func=cmd_recommend)
 

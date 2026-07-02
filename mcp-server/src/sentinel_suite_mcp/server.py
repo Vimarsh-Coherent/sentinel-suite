@@ -117,11 +117,13 @@ def orchestrate_inbox(recipient: str, unread_only: bool = False) -> list[dict]:
 # ---- router + skill authoring ----------------------------------------------
 
 @mcp.tool()
-def recommend_for_prompt(prompt: str, kind: str = "both", top: int = 5) -> dict:
+def recommend_for_prompt(prompt: str, kind: str = "both", top: int = 5,
+                         method: str = "tfidf") -> dict:
     """Given a natural-language task, return the best-matching ecc agents and/or
-    skills (kind = both | agents | skills). Use this to auto-pick which agent to
-    delegate to or which skill to apply for the user's request."""
-    return cap.recommend(prompt, kind, top)
+    skills (kind = both | agents | skills). method = "tfidf" (semantic keyword
+    ranking, default) or "embed" (true embeddings if installed). Use this to
+    auto-pick which agent to delegate to or which skill to apply."""
+    return cap.recommend(prompt, kind, top, method)
 
 
 @mcp.tool()

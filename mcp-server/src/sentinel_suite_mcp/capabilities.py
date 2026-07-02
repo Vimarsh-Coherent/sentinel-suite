@@ -231,26 +231,32 @@ def clear_router_cache() -> None:
         pass
 
 
-def recommend(prompt: str, kind: str = "both", top: int = 5) -> dict:
+def recommend(prompt: str, kind: str = "both", top: int = 5, method: str = "tfidf") -> dict:
     """Given a natural-language prompt, return the best-matching agents/skills.
 
-    `kind` is "both" | "agents" | "skills". Scores by keyword overlap against
-    each item's name (weighted) + description. Items with score 0 are dropped.
+    `kind`   = "both" | "agents" | "skills".
+    `method` = "tfidf" (default; semantic TF-IDF cosine, zero-dep, fast) or
+               "embed" (true embeddings via sentence-transformers, if installed;
+               falls back to tfidf when unavailable).
     Uses a cached index so it's fast enough to run on every prompt.
     """
-    ptoks = _tokens(prompt)
-    out: dict = {"prompt": prompt, "agents": [], "skills": []}
-    if not ptoks:
+    out: dict = {"prompt": prompt, "method": method, "agents": [], "skills": []}
+    if not _tokens(prompt):
         return out
 
-    def rank(items):
-        scored = [(_score(ptoks, it["name"], it.get("description", "")), it) for it in items]
-        scored = [(s, it) for s, it in scored if s > 0 and it["name"] != "(unavailable)"]
-        scored.sort(key=lambda x: -x[0])
-        return [{"name": it["name"], "description": it.get("description", ""), "score": s}
-                for s, it in scored[:top]]
-
+    from . import router as _router
     index = get_router_index()
+    use_embed = method == "embed" and _router.embeddings_available()
+    if method == "embed" and not use_embed:
+        out["method"] = "tfidf (embeddings not installed)"
+
+    def rank(items):
+        if not items:
+            return []
+        if use_embed:
+            return _router.embed_query(items, prompt, top)
+        return _router.TfidfRouter(items).query(prompt, top)
+
     if kind in ("both", "agents"):
         out["agents"] = rank(index.get("agents", []))
     if kind in ("both", "skills"):
