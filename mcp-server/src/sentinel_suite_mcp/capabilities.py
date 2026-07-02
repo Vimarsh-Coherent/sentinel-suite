@@ -11,6 +11,7 @@ Paths are resolved relative to the Sentinel Suite repo root, discovered as:
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -160,6 +161,72 @@ def ecc_get_agent(name: str) -> str:
     if not f.is_file():
         return f"agent not found: {name}"
     return f.read_text(encoding="utf-8", errors="ignore")
+
+
+# ---------------------------------------------------------------------------
+# Router — "given a prompt, which agent/skill should I use?"
+# ---------------------------------------------------------------------------
+
+_STOP = {
+    "the", "a", "an", "to", "for", "of", "and", "or", "in", "on", "with", "my",
+    "me", "i", "is", "it", "this", "that", "please", "need", "want", "can", "you",
+    "help", "make", "do", "use", "using", "how", "add", "create", "get", "some",
+    "into", "from", "our", "your", "are", "be", "should", "would", "could", "will",
+}
+
+
+def _tokens(text: str) -> set:
+    return {w for w in re.split(r"[^a-z0-9]+", (text or "").lower())
+            if len(w) > 2 and w not in _STOP}
+
+
+def _score(prompt_toks: set, name: str, desc: str) -> int:
+    # name matches count double (a skill named "tdd" beats one that just mentions it)
+    return 2 * len(prompt_toks & _tokens(name)) + len(prompt_toks & _tokens(desc))
+
+
+def recommend(prompt: str, kind: str = "both", top: int = 5) -> dict:
+    """Given a natural-language prompt, return the best-matching agents/skills.
+
+    `kind` is "both" | "agents" | "skills". Scores by keyword overlap against
+    each item's name (weighted) + description. Items with score 0 are dropped.
+    """
+    ptoks = _tokens(prompt)
+    out: dict = {"prompt": prompt, "agents": [], "skills": []}
+    if not ptoks:
+        return out
+
+    def rank(items):
+        scored = [(_score(ptoks, it["name"], it.get("description", "")), it) for it in items]
+        scored = [(s, it) for s, it in scored if s > 0 and it["name"] != "(unavailable)"]
+        scored.sort(key=lambda x: -x[0])
+        return [{"name": it["name"], "description": it.get("description", ""), "score": s}
+                for s, it in scored[:top]]
+
+    if kind in ("both", "agents"):
+        out["agents"] = rank(ecc_list_agents())
+    if kind in ("both", "skills"):
+        out["skills"] = rank(ecc_list_skills())
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Skill authoring — create new skills easily
+# ---------------------------------------------------------------------------
+
+def create_skill(name: str, description: str, instructions: str = "",
+                 cwd: Optional[str] = None) -> dict:
+    """Scaffold a new skill at ./.claude/skills/<slug>/SKILL.md."""
+    slug = re.sub(r"[^a-z0-9-]+", "-", name.lower()).strip("-") or "skill"
+    base = Path(cwd or os.getcwd()) / ".claude" / "skills" / slug
+    base.mkdir(parents=True, exist_ok=True)
+    body = instructions.strip() or (
+        "## When to use\nDescribe the situations this skill applies to.\n\n"
+        "## Steps\n1. ...\n2. ...\n")
+    content = f"---\nname: {slug}\ndescription: {description}\n---\n\n# {name}\n\n{body}\n"
+    path = base / "SKILL.md"
+    path.write_text(content, encoding="utf-8")
+    return {"created": str(path), "name": slug}
 
 
 # ---------------------------------------------------------------------------

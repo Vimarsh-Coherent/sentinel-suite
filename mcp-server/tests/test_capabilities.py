@@ -44,6 +44,28 @@ def test_create_tentacle(tmp_path):
     assert "created tentacle" in msg
 
 
+def test_recommend_surfaces_matches():
+    rec = cap.recommend("add unit tests with test driven development")
+    assert rec["agents"] or rec["skills"]
+    for group in ("agents", "skills"):
+        scores = [x["score"] for x in rec[group]]
+        assert scores == sorted(scores, reverse=True)
+
+
+def test_recommend_empty_prompt():
+    rec = cap.recommend("")
+    assert rec["agents"] == [] and rec["skills"] == []
+
+
+def test_create_skill(tmp_path):
+    r = cap.create_skill("My Cool Skill", "does cool things", cwd=str(tmp_path))
+    p = tmp_path / ".claude" / "skills" / "my-cool-skill" / "SKILL.md"
+    assert p.is_file()
+    text = p.read_text(encoding="utf-8")
+    assert "name: my-cool-skill" in text
+    assert "does cool things" in text
+
+
 def test_info():
     i = cap.info()
     assert i["name"] == "sentinel-suite"

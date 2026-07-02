@@ -17,6 +17,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from . import _guard
@@ -248,6 +249,55 @@ def cmd_orch_messages(a) -> int:
     return 0
 
 
+def cmd_orch_watch(a) -> int:
+    """Auto-inbox: poll a tentacle's inbox; print (and optionally run a handler)."""
+    from .orchestrator import Orchestrator
+    o = Orchestrator(a.root)
+    print(f"👀 watching inbox for '{a.tentacle}' every {a.interval}s (Ctrl+C to stop)")
+    try:
+        while True:
+            for m in o.inbox(a.tentacle, unread_only=True):
+                print(f"[{m.id}] {m.sender} → {m.recipient}: {m.body}")
+                if a.on_message:
+                    cmd = (a.on_message.replace("{body}", m.body)
+                           .replace("{sender}", m.sender).replace("{id}", m.id))
+                    subprocess.run(cmd, shell=True)
+                o.mark_read(m.id)
+            if a.once:
+                break
+            time.sleep(a.interval)
+    except KeyboardInterrupt:
+        print("\nstopped.")
+    return 0
+
+
+# ---- router + skill authoring ----------------------------------------------
+
+def cmd_recommend(a) -> int:
+    rec = cap.recommend(" ".join(a.prompt), a.kind, a.top)
+    if a.json:
+        print(json.dumps(rec, indent=2))
+        return 0
+    if rec["agents"]:
+        print("Best agents:")
+        for it in rec["agents"]:
+            print(f"  • {it['name']:<26} (score {it['score']})  {it['description'][:60]}")
+    if rec["skills"]:
+        print("Best skills:")
+        for it in rec["skills"]:
+            print(f"  • {it['name']:<26} (score {it['score']})  {it['description'][:60]}")
+    if not rec["agents"] and not rec["skills"]:
+        print("No strong match. Try `sentinel-suite agents` / `skills` to browse.")
+    return 0
+
+
+def cmd_skill_new(a) -> int:
+    r = cap.create_skill(a.name, a.description or "", a.body or "")
+    print(f"✅ created skill '{r['name']}' at {r['created']}")
+    print("   Restart Claude Code to load it.")
+    return 0
+
+
 def cmd_info(a) -> int:
     print(json.dumps(cap.info(), indent=2))
     return 0
@@ -345,6 +395,19 @@ def build_parser() -> argparse.ArgumentParser:
                     help="also guard every repo on this machine")
     sp.set_defaults(func=cmd_setup)
 
+    sp = sub.add_parser("recommend", help="given a prompt, suggest the best agent(s)/skill(s)")
+    sp.add_argument("prompt", nargs="+")
+    sp.add_argument("--kind", choices=["both", "agents", "skills"], default="both")
+    sp.add_argument("--top", type=int, default=5)
+    sp.add_argument("--json", action="store_true")
+    sp.set_defaults(func=cmd_recommend)
+
+    sp = sub.add_parser("skill-new", help="create a new skill (./.claude/skills/<name>/SKILL.md)")
+    sp.add_argument("name")
+    sp.add_argument("--description", default=None)
+    sp.add_argument("--body", default=None)
+    sp.set_defaults(func=cmd_skill_new)
+
     # orchestrator (pure-Python port of Octogent)
     orch = sub.add_parser("orchestrate", help="multi-session orchestrator (Python port of Octogent)")
     osub = orch.add_subparsers(dest="action", required=True)
@@ -398,6 +461,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp = osub.add_parser("messages", help="show all messages")
     sp.add_argument("--root", default=None)
     sp.set_defaults(func=cmd_orch_messages)
+
+    sp = osub.add_parser("watch", help="auto-inbox: poll a tentacle's inbox and act on messages")
+    sp.add_argument("tentacle")
+    sp.add_argument("--interval", type=float, default=5.0)
+    sp.add_argument("--on-message", default=None,
+                    help="shell command to run per message ({body},{sender},{id} substituted)")
+    sp.add_argument("--once", action="store_true", help="check once and exit (for testing)")
+    sp.add_argument("--root", default=None)
+    sp.set_defaults(func=cmd_orch_watch)
 
     return p
 

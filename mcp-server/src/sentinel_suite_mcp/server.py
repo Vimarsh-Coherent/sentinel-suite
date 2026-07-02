@@ -114,6 +114,23 @@ def orchestrate_inbox(recipient: str, unread_only: bool = False) -> list[dict]:
     return cap.orchestrate_inbox(recipient, unread_only)
 
 
+# ---- router + skill authoring ----------------------------------------------
+
+@mcp.tool()
+def recommend_for_prompt(prompt: str, kind: str = "both", top: int = 5) -> dict:
+    """Given a natural-language task, return the best-matching ecc agents and/or
+    skills (kind = both | agents | skills). Use this to auto-pick which agent to
+    delegate to or which skill to apply for the user's request."""
+    return cap.recommend(prompt, kind, top)
+
+
+@mcp.tool()
+def create_skill(name: str, description: str, instructions: str = "") -> dict:
+    """Create a new skill file at ./.claude/skills/<name>/SKILL.md so it becomes
+    available to Claude Code."""
+    return cap.create_skill(name, description, instructions)
+
+
 # ---- meta -------------------------------------------------------------------
 
 @mcp.tool()

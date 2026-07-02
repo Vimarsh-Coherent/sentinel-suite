@@ -53,6 +53,18 @@ def test_messaging(tmp_path):
     assert m.id not in [x.id for x in o.inbox("frontend", unread_only=True)]
 
 
+def test_watch_once(tmp_path):
+    import argparse
+    from sentinel_suite_mcp.cli import cmd_orch_watch
+    o = Orchestrator(str(tmp_path))
+    o.send_message("boss", "frontend", "do the thing")
+    ns = argparse.Namespace(tentacle="frontend", interval=0.1, on_message=None,
+                            once=True, root=str(tmp_path))
+    assert cmd_orch_watch(ns) == 0
+    # the message was consumed (marked read)
+    assert o.inbox("frontend", unread_only=True) == []
+
+
 def test_http_api(tmp_path):
     o = Orchestrator(str(tmp_path))
     o.scaffold()
