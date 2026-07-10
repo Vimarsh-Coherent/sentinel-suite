@@ -72,6 +72,27 @@ def test_info():
     assert "Sentinel Suite Guard" in i["capabilities"]
 
 
+def test_repo_root_ignores_stale_env(tmp_path, monkeypatch):
+    # A SENTINEL_SUITE_ROOT that isn't a real checkout (no vendor/ or plugins/)
+    # must be ignored, not trusted — otherwise it silently masks the bundle.
+    stale = tmp_path / "not-a-checkout"
+    stale.mkdir()
+    monkeypatch.setenv("SENTINEL_SUITE_ROOT", str(stale))
+    root = cap.repo_root()
+    assert root != stale, "stale root without vendor/ or plugins/ must be rejected"
+
+
+def test_ecc_available_despite_mispointed_root(tmp_path, monkeypatch):
+    # Even when the env var points at a checkout-shaped dir that lacks vendor/ecc,
+    # the ecc skills/agents must still resolve (via the in-tree / bundled fallback).
+    fake_checkout = tmp_path / "other-checkout"
+    (fake_checkout / "plugins").mkdir(parents=True)  # looks like a checkout, no vendor/ecc
+    monkeypatch.setenv("SENTINEL_SUITE_ROOT", str(fake_checkout))
+    skills = cap.ecc_list_skills()
+    assert len(skills) > 50, "ecc data must resolve independently of a mispointed root"
+    assert skills[0]["name"] != "(unavailable)"
+
+
 def test_server_exposes_all_tools():
     tools = asyncio.run(mcp.list_tools())
     names = {t.name for t in tools}
