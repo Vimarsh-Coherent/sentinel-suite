@@ -17,6 +17,11 @@ from pathlib import Path
 from typing import Optional
 
 
+def _is_checkout(p: Path) -> bool:
+    """True if `p` looks like a real Sentinel Suite checkout (has vendor/ or plugins/)."""
+    return (p / "vendor").is_dir() or (p / "plugins").is_dir()
+
+
 def repo_root() -> Optional[Path]:
     """The Sentinel Suite repo checkout, if available.
 
@@ -24,12 +29,20 @@ def repo_root() -> Optional[Path]:
     file (works in an editable install inside the repo). Returns None when the
     package is pip-installed standalone and no checkout is reachable — callers
     then degrade gracefully.
+
+    The env var is only honored when it actually points at a checkout (contains
+    vendor/ or plugins/). A stale SENTINEL_SUITE_ROOT pointing somewhere else
+    would otherwise silently mask the real bundle, so we fall through to the
+    in-tree guess instead of trusting it blindly.
     """
     env = os.environ.get("SENTINEL_SUITE_ROOT")
-    if env and Path(env).is_dir():
-        return Path(env)
+    if env:
+        p = Path(env)
+        if p.is_dir() and _is_checkout(p):
+            return p
+        # else: ignore the stale/misconfigured value and fall through.
     guess = Path(__file__).resolve().parents[3]
-    return guess if (guess / "vendor").is_dir() or (guess / "plugins").is_dir() else None
+    return guess if _is_checkout(guess) else None
 
 
 _NO_REPO = ("This needs the full Sentinel Suite checkout. Clone it and set "
@@ -39,13 +52,24 @@ _NO_REPO = ("This needs the full Sentinel Suite checkout. Clone it and set "
 
 
 def _ecc() -> Optional[Path]:
-    # Prefer a full checkout; otherwise use the ecc skills/agents bundled into
-    # the wheel (so a plain `pip install` ships the whole library).
+    """Locate the bundled ecc skills/agents, trying candidates in priority order.
+
+    Resolved independently of ``repo_root()`` so a mispointed SENTINEL_SUITE_ROOT
+    (e.g. one aimed at a sibling checkout that has no ``vendor/ecc``) can't mask
+    the data. Order: the configured root, then the wheel-bundled ``_data/ecc``,
+    then the in-tree checkout four parents up.
+    """
+    here = Path(__file__).resolve()
     root = repo_root()
-    if root and (root / "vendor" / "ecc").is_dir():
-        return root / "vendor" / "ecc"
-    bundled = Path(__file__).resolve().parent / "_data" / "ecc"
-    return bundled if bundled.is_dir() else None
+    candidates = [
+        (root / "vendor" / "ecc") if root else None,     # configured / in-tree checkout
+        here.parent / "_data" / "ecc",                   # wheel install (bundled data)
+        here.parents[3] / "vendor" / "ecc",              # source tree, even if root points elsewhere
+    ]
+    for c in candidates:
+        if c and c.is_dir():
+            return c
+    return None
 
 
 # ---------------------------------------------------------------------------
